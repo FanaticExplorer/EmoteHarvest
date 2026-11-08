@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -44,6 +45,8 @@ var (
 	pauseBeforeExit bool
 )
 
+var version = "dev"
+
 func main() {
 	_ = godotenv.Load()
 
@@ -55,18 +58,15 @@ func main() {
 	flag.BoolVar(&opts.refresh, "refresh", false, "refetch guild metadata")
 	flag.BoolVar(&opts.force, "force", false, "redownload files that already exist")
 	flag.BoolVar(&opts.quiet, "quiet", false, "disable progress output")
+	versionFlag := flag.Bool("version", false, "print version and exit")
 
-	flag.Usage = func() {
-		out := flag.CommandLine.Output()
-		fmt.Fprintf(out, "Usage: %s [flags] <invite-url|invite-code|guild-id> [token]\n", filepath.Base(os.Args[0]))
-		fmt.Fprintln(out, "Run without arguments for an interactive prompt.")
-		fmt.Fprintln(out, "Token: -token, second positional argument, DISCORD_TOKEN, or .env.")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
+	flag.Usage = usage
 
-	if flag.NArg() > 1 && strings.HasPrefix(flag.Arg(1), "-") {
-		fatal("flags must come before the invite/ID")
+	_ = flag.CommandLine.Parse(hoistFlags(os.Args[1:]))
+
+	if *versionFlag {
+		fmt.Println(versionLine())
+		return
 	}
 
 	interactive = term.IsTerminal(int(os.Stdin.Fd()))
@@ -325,6 +325,104 @@ func missingTokenHelp() {
 	fmt.Fprintln(os.Stderr, "for private servers, invite the bot to the server first")
 	pause()
 	os.Exit(1)
+}
+
+func usage() {
+	out := flag.CommandLine.Output()
+	name := filepath.Base(os.Args[0])
+
+	fmt.Fprintf(out, "Usage: %s [flags] <invite-url|invite-code|guild-id> [token]\n\n", name)
+	fmt.Fprintln(out, "Run without arguments for an interactive prompt.")
+	fmt.Fprintln(out, "Exit codes: 0 success, 1 failure, 2 bad flags.")
+	fmt.Fprintln(out, "\nExamples:")
+	examples := [][2]string{
+		{name, "interactive prompt"},
+		{name + " archlinux", "invite code"},
+		{name + " https://discord.gg/archlinux", "invite link"},
+		{name + " 1145481614856556706", "server ID"},
+		{name + " -force -workers 10 archlinux", "replace existing files"},
+	}
+	width := 0
+	for _, example := range examples {
+		if len(example[0]) > width {
+			width = len(example[0])
+		}
+	}
+	for _, example := range examples {
+		fmt.Fprintf(out, "  %-*s  %s\n", width, example[0], example[1])
+	}
+	fmt.Fprintln(out, "\nToken, first match wins:")
+	fmt.Fprintln(out, "  -token <token>, second positional argument, DISCORD_TOKEN, or .env")
+	fmt.Fprintln(out, "\nFlags:")
+	flag.PrintDefaults()
+}
+
+// hoistFlags moves flags that follow a positional argument in front of it, so
+// argument order does not matter. Everything after a bare "--" is left alone.
+func hoistFlags(args []string) []string {
+	var flags, rest []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "--" {
+			rest = append(rest, args[i:]...)
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			rest = append(rest, arg)
+			continue
+		}
+
+		flags = append(flags, arg)
+		if flagTakesValue(arg) && i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+
+	return append(flags, rest...)
+}
+
+func flagTakesValue(arg string) bool {
+	name := strings.TrimLeft(arg, "-")
+	if strings.Contains(name, "=") {
+		return false
+	}
+
+	switch name {
+	case "token", "out", "workers":
+		return true
+	}
+	return false
+}
+
+func versionLine() string {
+	out := "emoteharvest " + version
+
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return out
+	}
+
+	var details []string
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			rev := setting.Value
+			if len(rev) > 7 {
+				rev = rev[:7]
+			}
+			details = append(details, "commit "+rev)
+		case "vcs.time":
+			details = append(details, "built "+setting.Value)
+		}
+	}
+	if len(details) == 0 {
+		return out
+	}
+
+	return out + " (" + strings.Join(details, ", ") + ")"
 }
 
 func pause() {
