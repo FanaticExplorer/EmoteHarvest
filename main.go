@@ -32,11 +32,11 @@ type options struct {
 
 var (
 	styleLabel = lipgloss.NewStyle().Faint(true).Width(8)
-	styleTitle = lipgloss.NewStyle().Bold(true)
+	styleTitle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(harvest.ColorBlurple))
 	styleHint  = lipgloss.NewStyle().Faint(true)
-	styleGood  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleSkip  = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	styleBad   = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+	styleGood  = lipgloss.NewStyle().Foreground(lipgloss.Color(harvest.ColorGreen))
+	styleSkip  = lipgloss.NewStyle().Foreground(lipgloss.Color(harvest.ColorYellow))
+	styleBad   = lipgloss.NewStyle().Foreground(lipgloss.Color(harvest.ColorRed))
 )
 
 var (
@@ -192,6 +192,34 @@ func row(label, value string) {
 	fmt.Printf("  %s %s\n", styleLabel.Render(label), value)
 }
 
+func discordTheme() *huh.Theme {
+	blurple := lipgloss.Color(harvest.ColorBlurple)
+	red := lipgloss.Color(harvest.ColorRed)
+	green := lipgloss.Color(harvest.ColorGreen)
+
+	t := huh.ThemeBase()
+
+	t.Focused.Title = t.Focused.Title.Bold(true).Foreground(blurple)
+	t.Focused.Description = t.Focused.Description.Faint(true)
+	t.Focused.ErrorIndicator = t.Focused.ErrorIndicator.Foreground(red)
+	t.Focused.ErrorMessage = t.Focused.ErrorMessage.Foreground(red)
+	t.Focused.SelectSelector = t.Focused.SelectSelector.Foreground(blurple)
+	t.Focused.SelectedOption = t.Focused.SelectedOption.Foreground(green)
+	t.Focused.SelectedPrefix = t.Focused.SelectedPrefix.Foreground(green)
+	t.Focused.NextIndicator = t.Focused.NextIndicator.Foreground(blurple)
+	t.Focused.PrevIndicator = t.Focused.PrevIndicator.Foreground(blurple)
+	t.Focused.FocusedButton = t.Focused.FocusedButton.Background(blurple).Foreground(lipgloss.Color("#FFFFFF"))
+	t.Focused.TextInput.Cursor = t.Focused.TextInput.Cursor.Foreground(blurple)
+	t.Focused.TextInput.Prompt = t.Focused.TextInput.Prompt.Foreground(blurple)
+	t.Focused.TextInput.Placeholder = t.Focused.TextInput.Placeholder.Faint(true)
+
+	t.Blurred = t.Focused
+	t.Blurred.Title = t.Blurred.Title.Faint(true)
+	t.Blurred.FocusedButton = t.Blurred.FocusedButton.Background(lipgloss.Color("#4E5058"))
+
+	return t
+}
+
 func counts(downloaded, skipped, failed int) string {
 	return fmt.Sprintf("%s downloaded · %s skipped · %s failed",
 		styleGood.Render(strconv.Itoa(downloaded)),
@@ -242,7 +270,7 @@ func runWizard(opts *options) error {
 	form := huh.NewForm(
 		huh.NewGroup(target...),
 		huh.NewGroup(tuning...),
-	)
+	).WithTheme(discordTheme())
 	if err := form.Run(); err != nil {
 		return err
 	}

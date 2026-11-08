@@ -295,7 +295,7 @@ type progress struct {
 }
 
 var (
-	barFilled = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	barFilled = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlurple))
 	barEmpty  = lipgloss.NewStyle().Faint(true)
 )
 
