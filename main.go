@@ -13,6 +13,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/FanaticExplorer/EmoteHarvest/internal/harvest"
 	"github.com/charmbracelet/huh"
@@ -110,6 +111,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	start := time.Now()
+
 	client := harvest.NewClient(opts.token)
 	identity, err := client.Authenticate(ctx)
 	if err != nil {
@@ -180,6 +183,7 @@ func main() {
 	fmt.Println()
 	row("Emojis", counts(len(emojiJobs)-len(emojiErrs), emojiSkipped, len(emojiErrs)))
 	row("Stickers", counts(len(stickerJobs)-len(stickerErrs), stickerSkipped, len(stickerErrs)))
+	row("Elapsed", styleHint.Render(formatDuration(time.Since(start))))
 	if len(allErrs) > 0 {
 		row("Errors", styleBad.Render(filepath.Join(guildDir, "errors.log")))
 	}
@@ -225,6 +229,13 @@ func counts(downloaded, skipped, failed int) string {
 		styleGood.Render(strconv.Itoa(downloaded)),
 		styleSkip.Render(strconv.Itoa(skipped)),
 		styleBad.Render(strconv.Itoa(failed)))
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	return d.Round(time.Second).String()
 }
 
 func runWizard(opts *options) error {
