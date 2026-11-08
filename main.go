@@ -12,9 +12,12 @@ import (
 	"strings"
 
 	"github.com/FanaticExplorer/EmoteHarvest/internal/harvest"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	tokenFlag := flag.String("token", "", "Discord bot token (or set DISCORD_TOKEN)")
 	outRoot := flag.String("out", "output", "output directory")
 	workers := flag.Int("workers", 5, "concurrent downloads")
@@ -24,7 +27,7 @@ func main() {
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <invite-url|invite-code|guild-id> [token]\n", filepath.Base(os.Args[0]))
-		fmt.Fprintln(flag.CommandLine.Output(), "Token: -token, second positional argument, or DISCORD_TOKEN.")
+		fmt.Fprintln(flag.CommandLine.Output(), "Token: -token, second positional argument, DISCORD_TOKEN, or .env.")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -52,7 +55,7 @@ func main() {
 	}
 	if token == "" {
 		fmt.Fprintln(os.Stderr, "missing bot token")
-		fmt.Fprintln(os.Stderr, "pass -token <token>, a second positional token, or set DISCORD_TOKEN")
+		fmt.Fprintln(os.Stderr, "pass -token <token>, a second positional token, set DISCORD_TOKEN, or add DISCORD_TOKEN to .env")
 		fmt.Fprintln(os.Stderr, "create a dummy bot: https://discord.com/developers/applications -> Bot -> Reset Token")
 		fmt.Fprintln(os.Stderr, "for private servers, invite the bot to the server first")
 		os.Exit(1)
