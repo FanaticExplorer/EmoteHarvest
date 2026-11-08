@@ -104,7 +104,9 @@ func PlanStickerJobs(data *GuildData, dir string, force bool) ([]Job, int) {
 		case 4:
 			ext = ".gif"
 		case 2:
-			// TODO: convert APNG stickers to GIF for viewers that don't animate PNGs.
+			// APNG is kept as-is: Discord serves no GIF variant (HTTP 415), and
+			// converting would cost 256 colors and hard alpha. Browsers and Discord
+			// animate it; Windows Photos and Explorer show only the first frame.
 			ext = ".png"
 		default:
 			ext = ".png"
