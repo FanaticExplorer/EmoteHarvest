@@ -19,8 +19,6 @@ const (
 	apiBase   = "https://discord.com/api/v10"
 	cdnBase   = "https://cdn.discordapp.com"
 	mediaBase = "https://media.discordapp.net"
-
-	userAgent = "EmoteHarvest/1.0 (+https://github.com/FanaticExplorer/EmoteHarvest)"
 )
 
 var (
@@ -155,7 +153,6 @@ func (c *Client) getJSON(ctx context.Context, apiPath string, dst any, auth bool
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("User-Agent", userAgent)
 	if auth {
 		req.Header.Set("Authorization", "Bot "+c.token)
 	}
@@ -186,8 +183,6 @@ func (c *Client) download(ctx context.Context, urls []string) (io.ReadCloser, st
 			lastErr = err
 			continue
 		}
-		req.Header.Set("User-Agent", userAgent)
-
 		resp, err := c.do(req)
 		if err != nil {
 			lastErr = err
@@ -217,6 +212,9 @@ func (c *Client) download(ctx context.Context, urls []string) (io.ReadCloser, st
 }
 
 func (c *Client) do(req *http.Request) (*http.Response, error) {
+	// An empty User-Agent suppresses Go's default "Go-http-client/1.1" header.
+	req.Header.Set("User-Agent", "")
+
 	const maxAttempts = 3
 
 	for attempt := 1; ; attempt++ {
