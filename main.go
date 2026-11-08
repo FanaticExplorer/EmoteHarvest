@@ -15,6 +15,7 @@ import (
 
 	"github.com/FanaticExplorer/EmoteHarvest/internal/harvest"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/joho/godotenv"
 	"golang.org/x/term"
 )
@@ -28,6 +29,15 @@ type options struct {
 	force   bool
 	quiet   bool
 }
+
+var (
+	styleLabel = lipgloss.NewStyle().Faint(true).Width(8)
+	styleTitle = lipgloss.NewStyle().Bold(true)
+	styleHint  = lipgloss.NewStyle().Faint(true)
+	styleGood  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	styleSkip  = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	styleBad   = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+)
 
 var (
 	interactive     bool
@@ -152,8 +162,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "warning: could not write guild.json:", err)
 	}
 
-	fmt.Printf("Guild: %s (%s)\n", folder, guildID)
-	fmt.Printf("Output: %s\n", guildDir)
+	fmt.Println()
+	row("Guild", styleTitle.Render(folder))
+	row("ID", styleHint.Render(guildID))
+	row("Output", styleHint.Render(guildDir))
+	fmt.Println()
 
 	emojiJobs, emojiSkipped := harvest.PlanEmojiJobs(data, emojiDir, opts.force)
 	stickerJobs, stickerSkipped := harvest.PlanStickerJobs(data, stickerDir, opts.force)
@@ -164,13 +177,26 @@ func main() {
 	allErrs := append(emojiErrs, stickerErrs...)
 	harvest.WriteErrors(guildDir, allErrs)
 
-	fmt.Printf("Emojis: %d downloaded, %d skipped, %d failed\n", len(emojiJobs)-len(emojiErrs), emojiSkipped, len(emojiErrs))
-	fmt.Printf("Stickers: %d downloaded, %d skipped, %d failed\n", len(stickerJobs)-len(stickerErrs), stickerSkipped, len(stickerErrs))
+	fmt.Println()
+	row("Emojis", counts(len(emojiJobs)-len(emojiErrs), emojiSkipped, len(emojiErrs)))
+	row("Stickers", counts(len(stickerJobs)-len(stickerErrs), stickerSkipped, len(stickerErrs)))
 	if len(allErrs) > 0 {
-		fmt.Printf("Errors: %s\n", filepath.Join(guildDir, "errors.log"))
+		row("Errors", styleBad.Render(filepath.Join(guildDir, "errors.log")))
 	}
+	fmt.Println()
 
 	pause()
+}
+
+func row(label, value string) {
+	fmt.Printf("  %s %s\n", styleLabel.Render(label), value)
+}
+
+func counts(downloaded, skipped, failed int) string {
+	return fmt.Sprintf("%s downloaded · %s skipped · %s failed",
+		styleGood.Render(strconv.Itoa(downloaded)),
+		styleSkip.Render(strconv.Itoa(skipped)),
+		styleBad.Render(strconv.Itoa(failed)))
 }
 
 func runWizard(opts *options) error {

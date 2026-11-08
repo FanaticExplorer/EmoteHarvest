@@ -15,6 +15,9 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
+
+	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 type Job struct {
@@ -283,29 +286,36 @@ func truncateRunes(s string, max int) string {
 }
 
 type progress struct {
-	label string
-	total int64
-	done  atomic.Int64
-	quiet bool
-	stop  chan struct{}
-	wg    sync.WaitGroup
+	label   string
+	total   int64
+	done    atomic.Int64
+	enabled bool
+	stop    chan struct{}
+	wg      sync.WaitGroup
 }
+
+var (
+	barFilled = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	barEmpty  = lipgloss.NewStyle().Faint(true)
+)
+
+const barWidth = 20
 
 func newProgress(label string, total int, quiet bool) *progress {
 	p := &progress{
-		label: label,
-		total: int64(total),
-		quiet: quiet,
-		stop:  make(chan struct{}),
+		label:   label,
+		total:   int64(total),
+		enabled: !quiet && total > 0 && term.IsTerminal(int(os.Stderr.Fd())),
+		stop:    make(chan struct{}),
 	}
-	if quiet || total == 0 {
+	if !p.enabled {
 		return p
 	}
 
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
@@ -325,15 +335,22 @@ func (p *progress) inc() {
 }
 
 func (p *progress) print() {
-	fmt.Fprintf(os.Stderr, "\r[%s] %d/%d", p.label, p.done.Load(), p.total)
+	done := p.done.Load()
+	filled := int(float64(done) / float64(p.total) * barWidth)
+	bar := barFilled.Render(strings.Repeat("█", filled)) +
+		barEmpty.Render(strings.Repeat("░", barWidth-filled))
+	percent := int(float64(done) / float64(p.total) * 100)
+
+	fmt.Fprintf(os.Stderr, "\r  %-9s %s %d/%d %3d%%", p.label, bar, done, p.total, percent)
 }
 
 func (p *progress) close() {
-	if !p.quiet && p.total > 0 {
-		close(p.stop)
-		p.wg.Wait()
-		fmt.Fprintln(os.Stderr)
+	if !p.enabled {
+		return
 	}
+	close(p.stop)
+	p.wg.Wait()
+	fmt.Fprintln(os.Stderr)
 }
 
 func SaveGuildData(dir string, data *GuildData) error {
