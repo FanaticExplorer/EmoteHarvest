@@ -60,8 +60,9 @@ type guildPreview struct {
 }
 
 type Client struct {
-	http  *http.Client
-	token string
+	http   *http.Client
+	token  string
+	scheme string
 }
 
 func NewClient(token string) *Client {
@@ -69,9 +70,41 @@ func NewClient(token string) *Client {
 	token = strings.TrimSpace(strings.TrimPrefix(token, "Bot "))
 
 	return &Client{
-		http:  &http.Client{Timeout: 30 * time.Second},
-		token: token,
+		http:   &http.Client{Timeout: 30 * time.Second},
+		token:  token,
+		scheme: "Bot ",
 	}
+}
+
+type Identity struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Bot      bool   `json:"bot"`
+}
+
+// Authenticate finds the Authorization scheme Discord accepts for this token:
+// "Bot " for bot tokens, "" for user tokens, which Discord wants sent bare.
+// Must run before any concurrent use, since it mutates the scheme.
+func (c *Client) Authenticate(ctx context.Context) (Identity, error) {
+	var lastStatus int
+	var lastErr error
+
+	for _, scheme := range []string{"Bot ", ""} {
+		c.scheme = scheme
+
+		var identity Identity
+		status, err := c.getJSON(ctx, "/users/@me", &identity, true)
+		if err == nil {
+			return identity, nil
+		}
+		lastStatus, lastErr = status, err
+	}
+
+	c.scheme = "Bot "
+	if lastStatus == http.StatusUnauthorized {
+		return Identity{}, errors.New("discord rejected the token (HTTP 401) as both bot and user credential; check -token or DISCORD_TOKEN")
+	}
+	return Identity{}, fmt.Errorf("verifying token: %w", lastErr)
 }
 
 func (c *Client) ResolveGuild(ctx context.Context, input string) (id, name string, err error) {
@@ -111,7 +144,7 @@ func (c *Client) FetchGuildData(ctx context.Context, guildID, knownName string) 
 		}, nil
 	}
 	if status == http.StatusUnauthorized {
-		return nil, errors.New("discord rejected the bot token (HTTP 401); check -token or DISCORD_TOKEN")
+		return nil, errors.New("discord rejected the token (HTTP 401); check -token or DISCORD_TOKEN")
 	}
 	if status != http.StatusForbidden && status != http.StatusNotFound {
 		return nil, fmt.Errorf("fetching guild preview: %w", err)
@@ -154,7 +187,7 @@ func (c *Client) getJSON(ctx context.Context, apiPath string, dst any, auth bool
 		return 0, err
 	}
 	if auth {
-		req.Header.Set("Authorization", "Bot "+c.token)
+		req.Header.Set("Authorization", c.scheme+c.token)
 	}
 
 	resp, err := c.do(req)

@@ -65,6 +65,14 @@ func main() {
 	defer stop()
 
 	client := harvest.NewClient(token)
+	identity, err := client.Authenticate(ctx)
+	if err != nil {
+		fatal("%v", err)
+	}
+	if !identity.Bot {
+		fmt.Fprintf(os.Stderr, "user token detected (%s), continuing with it; self-bot use violates Discord's ToS -- you take the responsibility\n", identity.Username)
+	}
+
 	guildID, inviteName, err := client.ResolveGuild(ctx, input)
 	if err != nil {
 		fatal("%v", err)
